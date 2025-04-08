@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Ortex Alert",
+  "version": "1.0.0",
+  "description": "Alerts when Ortex's Interesting Options Flow shows abnormally high volume",
+  "action": {
+    "default_popup": "index.html"
+  },
+  "permissions": []
+}
