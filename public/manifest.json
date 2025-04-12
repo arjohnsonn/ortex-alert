@@ -6,15 +6,5 @@
   "action": {
     "default_popup": "index.html"
   },
-  "permissions": ["storage"],
-  "content_scripts": [
-    {
-      "matches": [
-        "https://app.ortex.com/s/ARCA/*",
-        "https://app.ortex.com/options?tab=interesting-options-flow"
-      ],
-      "js": ["content.js"],
-      "css": ["popup.css"]
-    }
-  ]
+  "permissions": []
 }
