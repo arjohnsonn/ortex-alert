@@ -1,7 +1,7 @@
-import { Settings, Bell } from "lucide-react";
+import { Settings, Bell, BellOff } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import AlertEntry from "@/components/ui/alertEntry";
+import AlertEntry from "@/components/AlertEntry";
 
 function App() {
   const [enabled, setEnabled] = useState(true);
@@ -25,7 +25,7 @@ function App() {
             onClick={() => setEnabled(!enabled)}
           >
             <div className="flex flex-row gap-x-2 items-center">
-              <Bell size={16} />
+              {enabled ? <Bell size={16} /> : <BellOff size={16} />}
               <p className="text-xs">{enabled ? "Active" : "Inactive"}</p>
             </div>
           </button>
