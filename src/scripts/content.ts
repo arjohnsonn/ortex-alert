@@ -6,6 +6,7 @@ import { get, write } from "@/lib/storage";
 type Settings = {
   enabled: boolean;
   darkMode: boolean;
+  alertSound: boolean;
   valueThreshold: number;
   minStrike: number;
   maxStrike: number;
@@ -16,6 +17,7 @@ type Settings = {
 const defaultSettings: Settings = {
   enabled: true,
   darkMode: false,
+  alertSound: true,
   valueThreshold: 800000,
   minStrike: 100,
   maxStrike: 800,
@@ -52,12 +54,28 @@ interface Alert {
 let VALUE_THRESHOLD = defaultSettings.valueThreshold;
 const USE_INITIAL_ENTRY_CUTOFF: boolean = true; // if true, discard new entries with timestamp <= cutoff
 
+const CURRENT_URL: string = window.location.href;
+const IS_INTERESTING_OPTIONS_FLOW: boolean = CURRENT_URL.includes(
+  "options?tab=interesting-options-flow"
+);
+const URL_SYMBOL: string | undefined = !IS_INTERESTING_OPTIONS_FLOW
+  ? extractSymbolFromUrl(CURRENT_URL)
+  : undefined;
+
+console.log("URL Symbol:", URL_SYMBOL);
+
 let settings: Settings;
 (async () => {
   settings = (await get("settings")) as Settings;
   if (settings === undefined) {
     settings = defaultSettings;
     write("settings", defaultSettings);
+  } else {
+    // Reconcile missing fields
+    settings = {
+      ...defaultSettings,
+      ...settings,
+    };
   }
 
   VALUE_THRESHOLD = settings.valueThreshold;
@@ -88,15 +106,18 @@ function extractSymbolFromUrl(url: string): string | undefined {
   }
 }
 
-const CURRENT_URL: string = window.location.href;
-const IS_INTERESTING_OPTIONS_FLOW: boolean = CURRENT_URL.includes(
-  "options?tab=interesting-options-flow"
-);
-const URL_SYMBOL: string | undefined = !IS_INTERESTING_OPTIONS_FLOW
-  ? extractSymbolFromUrl(CURRENT_URL)
-  : undefined;
+const iframe = document.createElement("iframe");
+iframe.id = "audioIframe";
+iframe.src = chrome.runtime.getURL("/iframe/audioPlayerIframe.html");
+iframe.allow = "autoplay";
 
-console.log("URL Symbol:", URL_SYMBOL);
+document.body.appendChild(iframe);
+
+function playSound() {
+  if (!settings.alertSound) return;
+
+  iframe.contentWindow!.postMessage({ message: "play" }, "*");
+}
 
 let initialCutoffTime: number | null = null;
 const symbolsByRowIndex: Map<string, string> = new Map();
@@ -1334,6 +1355,7 @@ function processEntriesAfterDelay(
           currentAlert.totalValue = total;
           currentAlert.timestamp = Date.now();
 
+          playSound();
           toastSystem.showToast(
             toastSystem.convertAlertToFlowAlert(currentAlert)
           );
@@ -1344,6 +1366,7 @@ function processEntriesAfterDelay(
           };
           alerts.push(newAlert);
 
+          playSound();
           toastSystem.showToast(toastSystem.convertAlertToFlowAlert(newAlert));
         }
         write("alerts", alerts);

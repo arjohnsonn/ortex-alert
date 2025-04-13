@@ -18,6 +18,11 @@ const Settings = () => {
           }
         }}
       />
+      <BooleanSetting
+        title="Alert Sound"
+        value={settings.alertSound}
+        id="alertSound"
+      />
       <InputSetting
         title="Value Threshold"
         value={settings.valueThreshold}

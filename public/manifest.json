@@ -9,12 +9,15 @@
   "permissions": ["storage"],
   "content_scripts": [
     {
-      "matches": [
-        "https://app.ortex.com/s/ARCA/*",
-        "https://app.ortex.com/options?tab=interesting-options-flow"
-      ],
+      "matches": ["https://app.ortex.com/*"],
       "js": ["content.js"],
       "css": ["popup.css"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["/iframe/*"],
+      "matches": ["https://app.ortex.com/*"]
     }
   ]
 }
