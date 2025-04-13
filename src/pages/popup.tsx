@@ -1,4 +1,4 @@
-import { Settings, Bell, BellOff } from "lucide-react";
+import { Settings, Bell, BellOff, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AlertEntry from "@/components/AlertEntry";
@@ -6,18 +6,35 @@ import AlertEntry from "@/components/AlertEntry";
 function App() {
   const [enabled, setEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   return (
     <>
-      <div className="poppins p-4 w-[31rem] h-[35rem] border-4 border-black flex flex-col">
+      <div
+        className={`poppins p-4 w-[31rem] h-[35rem] border-4 border-black flex flex-col ${
+          isDarkMode ? "bg-zinc-900 text-white" : "bg-white text-black"
+        }`}
+      >
         <div className="w-full flex flex-row justify-between">
           <h1 className="text-xl font-bold">Ortex Alert</h1>
-          <button className="transition transform active:scale-90">
-            <Settings size={16} />
-          </button>
-        </div>
+          <div className="flex flex-row gap-x-4 items-center">
+            <button
+              className="transition transform active:scale-90"
+              onClick={() => setIsDarkMode(!isDarkMode)}
+            >
+              {isDarkMode ? (
+                <Sun size={16} className="text-white border-white" />
+              ) : (
+                <Moon size={16} className="text-black" />
+              )}
+            </button>
+            <button className="transition transform active:scale-90">
+              <Settings size={16} />
+            </button>
+          </div>
+        </div>``
         <div className="w-full mt-1 flex flex-row justify-between">
-          <h2 className="text-xs">For Interesting Options Flow</h2>
+          <h2 className="text-xs">For Options Flow</h2>
           <button
             className={`transition transform active:scale-90 ${
               enabled ? "text-green-500" : "text-red-500"
@@ -37,22 +54,30 @@ function App() {
             value={activeTab}
             onValueChange={setActiveTab}
           >
-            <TabsList className="w-full h-8 dark:bg-gray-700">
+            <TabsList
+              className={`w-full h-8 ${isDarkMode ? "bg-zinc-800" : ""}`}
+            >
               <TabsTrigger
                 value="all"
-                className="dark:data-[state=active]:bg-gray-600"
+                className={`${
+                  isDarkMode ? "data-[state=active]:bg-zinc-700 text-white" : ""
+                }`}
               >
                 All
               </TabsTrigger>
               <TabsTrigger
                 value="call"
-                className="dark:data-[state=active]:bg-gray-600"
+                className={`${
+                  isDarkMode ? "data-[state=active]:bg-zinc-700 text-white" : ""
+                }`}
               >
                 Calls
               </TabsTrigger>
               <TabsTrigger
                 value="put"
-                className="dark:data-[state=active]:bg-gray-600"
+                className={`${
+                  isDarkMode ? "data-[state=active]:bg-zinc-700 text-white" : ""
+                }`}
               >
                 Puts
               </TabsTrigger>
@@ -64,6 +89,7 @@ function App() {
             >
               {/* FILLER ENTRIES */}
               <AlertEntry
+                darkMode={isDarkMode}
                 type="call"
                 symbol="AAPL"
                 date={new Date().toISOString()}
@@ -75,6 +101,7 @@ function App() {
               />
 
               <AlertEntry
+                darkMode={isDarkMode}
                 type="call"
                 symbol="SPY"
                 date={new Date().toISOString()}
@@ -86,6 +113,7 @@ function App() {
               />
 
               <AlertEntry
+                darkMode={isDarkMode}
                 type="put"
                 symbol="SPY"
                 date={new Date().toISOString()}
@@ -97,6 +125,7 @@ function App() {
               />
 
               <AlertEntry
+                darkMode={isDarkMode}
                 type="call"
                 symbol="QQQ"
                 date={new Date().toISOString()}
@@ -108,6 +137,7 @@ function App() {
               />
 
               <AlertEntry
+                darkMode={isDarkMode}
                 type="put"
                 symbol="NVDA"
                 date={new Date().toISOString()}
