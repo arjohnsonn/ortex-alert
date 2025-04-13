@@ -1,17 +1,72 @@
 import { create } from "zustand";
-import { get, write } from "./storage";
+
+/**
+ * Reads a value from chrome.storage.local for a given key.
+ *
+ * @param key - The key of the item to read.
+ * @returns A promise that resolves to the value stored, or undefined if not found.
+ */
+export async function get<T>(key: string): Promise<T | undefined> {
+  return new Promise<T | undefined>((resolve, reject) => {
+    chrome.storage.local.get(key, (result) => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "Error reading from chrome.storage.local:",
+          chrome.runtime.lastError.message
+        );
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve(result[key]);
+    });
+  });
+}
+
+/**
+ * Writes a key-value pair to chrome.storage.local.
+ *
+ * @param key - The key under which the value should be stored.
+ * @param value - The value to store (must be JSON-serializable).
+ * @returns A promise that resolves when the value has been stored.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function write(key: string, value: any): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    chrome.storage.local.set({ [key]: value }, () => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "Error writing to chrome.storage.local:",
+          chrome.runtime.lastError.message
+        );
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve();
+    });
+  });
+}
 
 export type Settings = {
   enabled: boolean;
   darkMode: boolean;
+  valueThreshold: number;
+  minStrike: number;
+  maxStrike: number;
+  minExp: number;
+  maxExp: number;
 };
 
-const defaultSettings: Settings = {
-  enabled: false,
+export const defaultSettings: Settings = {
+  enabled: true,
   darkMode: false,
+  valueThreshold: 800000,
+  minStrike: 100,
+  maxStrike: 800,
+  minExp: 0,
+  maxExp: 365,
 };
 
-let initialSettings: Settings = defaultSettings;
+const initialSettings: Settings = defaultSettings;
 
 const useSettingStore = create<{
   settings: Settings;

@@ -1,6 +1,27 @@
 import mockEntry from "@/components/mockEntry";
 import mockSymbol from "@/components/mockSymbol";
 import toastStyle from "@/components/toastStyle";
+import { get, write } from "@/lib/storage";
+
+type Settings = {
+  enabled: boolean;
+  darkMode: boolean;
+  valueThreshold: number;
+  minStrike: number;
+  maxStrike: number;
+  minExp: number;
+  maxExp: number;
+};
+
+const defaultSettings: Settings = {
+  enabled: true,
+  darkMode: false,
+  valueThreshold: 800000,
+  minStrike: 100,
+  maxStrike: 800,
+  minExp: 0,
+  maxExp: 365,
+};
 
 interface Entry {
   time: number;
@@ -14,6 +35,7 @@ interface Entry {
   symbol?: string;
   id?: string;
   shownInAlert: boolean;
+  verified: boolean;
 }
 
 interface Alert {
@@ -26,11 +48,32 @@ interface Alert {
   id: string;
 }
 
-import { get, write } from "@/lib/storage";
-
 // SETTINGS
-const VALUE_THRESHOLD = 1;
+let VALUE_THRESHOLD = defaultSettings.valueThreshold;
 const USE_INITIAL_ENTRY_CUTOFF: boolean = true; // if true, discard new entries with timestamp <= cutoff
+
+let settings: Settings;
+(async () => {
+  settings = (await get("settings")) as Settings;
+  if (settings === undefined) {
+    settings = defaultSettings;
+    write("settings", defaultSettings);
+  }
+
+  VALUE_THRESHOLD = settings.valueThreshold;
+  console.log("Settings loaded:", settings);
+})();
+
+chrome.runtime.onMessage.addListener(async function () {
+  settings = (await get("settings")) as Settings;
+  if (settings === undefined) {
+    settings = defaultSettings;
+    write("settings", defaultSettings);
+  }
+
+  VALUE_THRESHOLD = settings.valueThreshold;
+  console.log("Settings updated:", settings);
+});
 
 function extractSymbolFromUrl(url: string): string | undefined {
   try {
@@ -38,7 +81,7 @@ function extractSymbolFromUrl(url: string): string | undefined {
     const pathParts = urlObj.pathname.split("/");
 
     if (pathParts.length >= 3) {
-      return pathParts[pathParts.length - 1];
+      return pathParts[pathParts.length - 2];
     }
   } catch (error) {
     console.error("Error extracting symbol from URL:", error);
@@ -52,6 +95,8 @@ const IS_INTERESTING_OPTIONS_FLOW: boolean = CURRENT_URL.includes(
 const URL_SYMBOL: string | undefined = !IS_INTERESTING_OPTIONS_FLOW
   ? extractSymbolFromUrl(CURRENT_URL)
   : undefined;
+
+console.log("URL Symbol:", URL_SYMBOL);
 
 let initialCutoffTime: number | null = null;
 const symbolsByRowIndex: Map<string, string> = new Map();
@@ -82,6 +127,195 @@ const waitForContainer = (
     observer.observe(document.body, { childList: true, subtree: true });
   }
 };
+
+/**
+ * Converts a string representing a date into a Unix timestamp (seconds).
+ *
+ * Supported formats:
+ * - "today"
+ *    → Returns today's date at 4:00 PM Eastern (3:00 PM CST).
+ * - "tomorrow"
+ *    → Returns tomorrow's date at midnight (local time).
+ * - "DD MM" or "DD MM YYYY"
+ *    → The date is interpreted at midnight (local time). If the year is omitted, the current year is assumed.
+ * - "DD MM at HH:MM" or "DD MM YYYY at HH:MM"
+ *    → Parses the date and time. In this case, the time is assumed to be in Central Standard Time (UTC‑06:00).
+ *
+ * @param input - The input date string.
+ * @returns The Unix timestamp (in seconds) for the specified date/time.
+ * @throws Error if the input format or date/time is invalid.
+ */
+function convertToUnixTimestamp(input: string): number {
+  const trimmed = input.trim().toLowerCase();
+  let date: Date;
+
+  // Helper: Pads numbers to two digits.
+  const pad = (n: number): string => (n < 10 ? "0" + n : n.toString());
+
+  // Branch for the "at" format: "DD MM at HH:MM" or "DD MM YYYY at HH:MM"
+  if (trimmed.includes("at")) {
+    // Split the string into date and time parts.
+    // For example: "11 apr at 15:10" => datePart: "11 apr", timePart: "15:10"
+    const [datePart, timePart] = trimmed.split("at").map((part) => part.trim());
+
+    // Parse the time (assumed to be in HH:MM format)
+    const timeParts = timePart.split(":");
+    if (timeParts.length !== 2) {
+      throw new Error("Invalid time format. Expected HH:MM.");
+    }
+    const hour = parseInt(timeParts[0], 10);
+    const minute = parseInt(timeParts[1], 10);
+    if (isNaN(hour) || isNaN(minute)) {
+      throw new Error("Invalid time numbers provided.");
+    }
+
+    // Parse the date part.
+    // The date part can be either "DD MM" or "DD MM YYYY". Month can be numeric or abbreviated.
+    const dateComponents = datePart.split(" ").filter(Boolean);
+    let dayNum: number;
+    let monthNum: number;
+    let yearNum: number;
+
+    if (dateComponents.length === 2 || dateComponents.length === 3) {
+      dayNum = parseInt(dateComponents[0], 10);
+      if (isNaN(dayNum)) {
+        throw new Error("Invalid day provided.");
+      }
+
+      const monthComponent = dateComponents[1];
+      // Check if the month is numeric.
+      if (/^\d+$/.test(monthComponent)) {
+        monthNum = parseInt(monthComponent, 10) - 1;
+      } else {
+        // Support abbreviated month names.
+        const monthMap: { [key: string]: number } = {
+          jan: 0,
+          feb: 1,
+          mar: 2,
+          apr: 3,
+          may: 4,
+          jun: 5,
+          jul: 6,
+          aug: 7,
+          sep: 8,
+          oct: 9,
+          nov: 10,
+          dec: 11,
+        };
+        const lowerMonth = monthComponent.toLowerCase();
+        if (monthMap[lowerMonth] === undefined) {
+          throw new Error("Invalid month provided.");
+        }
+        monthNum = monthMap[lowerMonth];
+      }
+
+      // If a year is provided, use it; otherwise, assume the current year.
+      if (dateComponents.length === 3) {
+        yearNum = parseInt(dateComponents[2], 10);
+        if (isNaN(yearNum)) {
+          throw new Error("Invalid year provided.");
+        }
+      } else {
+        yearNum = new Date().getFullYear();
+      }
+    } else {
+      throw new Error(
+        'Invalid date part in "at" format. Expected "DD MM" or "DD MM YYYY".'
+      );
+    }
+
+    // Create an ISO string that fixes the timezone to CST (-06:00).
+    // Format: YYYY-MM-DDTHH:MM:00-06:00
+    const isoString = `${yearNum}-${pad(monthNum + 1)}-${pad(dayNum)}T${pad(
+      hour
+    )}:${pad(minute)}:00-06:00`;
+    date = new Date(isoString);
+  } else if (trimmed === "today") {
+    // Format "today": use the Intl API to get the current date in Eastern Time ("America/New_York").
+    const options: Intl.DateTimeFormatOptions = {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "America/New_York",
+    };
+    const estDateStr = new Intl.DateTimeFormat("en-US", options).format(
+      new Date()
+    );
+    // estDateStr is in the format "MM/DD/YYYY" (e.g., "04/13/2025").
+    const [month, day, year] = estDateStr.split("/");
+    // Construct an ISO string for 4:00 PM with a fixed -05:00 offset (EST).
+    const isoString = `${year}-${month}-${day}T16:00:00-05:00`;
+    date = new Date(isoString);
+  } else if (trimmed === "tomorrow") {
+    // Create a date for tomorrow at midnight (local time).
+    date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + 1);
+  } else {
+    // Handle the "DD MM" and "DD MM YYYY" formats without time.
+    const parts = trimmed.split(" ").filter(Boolean);
+    if (parts.length !== 2 && parts.length !== 3) {
+      throw new Error(
+        'Invalid input: expected "DD MM", "DD MM YYYY", "today", "tomorrow", or a format with "at".'
+      );
+    }
+
+    const dayNum = parseInt(parts[0], 10);
+    let monthNum: number;
+    // Parse month; assume numeric.
+    if (/^\d+$/.test(parts[1])) {
+      monthNum = parseInt(parts[1], 10) - 1;
+    } else {
+      // Allow abbreviated month names.
+      const monthMap: { [key: string]: number } = {
+        jan: 0,
+        feb: 1,
+        mar: 2,
+        apr: 3,
+        may: 4,
+        jun: 5,
+        jul: 6,
+        aug: 7,
+        sep: 8,
+        oct: 9,
+        nov: 10,
+        dec: 11,
+      };
+      const lowerMonth = parts[1].toLowerCase();
+      if (monthMap[lowerMonth] === undefined) {
+        throw new Error("Invalid month provided.");
+      }
+      monthNum = monthMap[lowerMonth];
+    }
+    let yearNum: number;
+    if (parts.length === 3) {
+      yearNum = parseInt(parts[2], 10);
+      if (isNaN(yearNum)) {
+        throw new Error("Invalid year provided.");
+      }
+    } else {
+      yearNum = new Date().getFullYear();
+    }
+
+    if (isNaN(dayNum) || isNaN(monthNum)) {
+      throw new Error("Invalid day or month provided.");
+    }
+
+    // Create a date at midnight (local time).
+    date = new Date(yearNum, monthNum, dayNum);
+    // Validate that the constructed date matches the user input.
+    if (
+      date.getDate() !== dayNum ||
+      date.getMonth() !== monthNum ||
+      date.getFullYear() !== yearNum
+    ) {
+      throw new Error("Invalid date provided.");
+    }
+  }
+
+  // Convert the date's milliseconds to a Unix timestamp (seconds)
+  return Math.floor(date.getTime() / 1000);
+}
 
 /**
  * Extract symbol from a pinned column row
@@ -143,13 +377,10 @@ function processPendingEntries() {
   });
 }
 
-/**
- * Parses a clock time string in "H:mm" or "HH:mm" format and returns
- * the total minutes since midnight.
- * Example: "1:06" returns 66, "1:05" returns 65.
- */
 function parseClockTime(text: string): number {
   const lowerText = text.toLowerCase().trim();
+
+  // Case 1: "yesterday at HH:MM"
   if (lowerText.startsWith("yesterday")) {
     // Remove "yesterday at" from text and then parse the time.
     const timePart = text.split("at")[1]?.trim() || "";
@@ -159,10 +390,102 @@ function parseClockTime(text: string): number {
     }
     const hours = Number.parseInt(parts[0], 10);
     const minutes = Number.parseInt(parts[1], 10);
-
     // Subtract one day (1440 minutes) from the computed total minutes.
     return hours * 60 + minutes - 1440;
-  } else {
+  }
+  // Case 2: "DD MM [YYYY] at HH:MM" format
+  else if (lowerText.includes(" at ")) {
+    // Split the input using " at " as a delimiter.
+    const [datePart, timePart] = lowerText
+      .split(" at ")
+      .map((part) => part.trim());
+
+    // Check if datePart looks like a date (has at least two tokens).
+    const dateTokens = datePart.split(" ").filter(Boolean);
+    if (dateTokens.length >= 2) {
+      // Parse the day.
+      const day = parseInt(dateTokens[0], 10);
+      if (isNaN(day)) {
+        throw new Error("Invalid day in date portion.");
+      }
+
+      // Parse the month, which may be numeric or abbreviated.
+      let month: number;
+      const monthToken = dateTokens[1];
+      if (/^\d+$/.test(monthToken)) {
+        month = parseInt(monthToken, 10);
+      } else {
+        const monthMap: { [key: string]: number } = {
+          jan: 1,
+          feb: 2,
+          mar: 3,
+          apr: 4,
+          may: 5,
+          jun: 6,
+          jul: 7,
+          aug: 8,
+          sep: 9,
+          oct: 10,
+          nov: 11,
+          dec: 12,
+        };
+        month = monthMap[monthToken];
+        if (!month) {
+          throw new Error("Invalid month in date portion.");
+        }
+      }
+      // If a year is provided, use it; otherwise, assume the current year.
+      let year: number;
+      if (dateTokens.length === 3) {
+        year = parseInt(dateTokens[2], 10);
+        if (isNaN(year)) {
+          throw new Error("Invalid year in date portion.");
+        }
+      } else {
+        year = new Date().getFullYear();
+      }
+
+      // Now parse the time part ("HH:MM").
+      const timeParts = timePart.split(":").map((s) => s.trim());
+      if (timeParts.length !== 2) {
+        throw new Error("Invalid time format in input.");
+      }
+      const hour = parseInt(timeParts[0], 10);
+      const minute = parseInt(timeParts[1], 10);
+      if (isNaN(hour) || isNaN(minute)) {
+        throw new Error("Invalid hour or minute in time portion.");
+      }
+
+      // Helper function to pad numbers to two digits.
+      const pad = (n: number): string => (n < 10 ? "0" + n : n.toString());
+
+      // Construct an ISO string that fixes the timezone to CST (-06:00).
+      // Example: "2025-04-11T15:10:00-06:00"
+      const isoString = `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(
+        minute
+      )}:00-06:00`;
+      const parsedDate = new Date(isoString);
+
+      // Compute the difference in minutes from today's midnight (local time).
+      const todayMidnight = new Date();
+      todayMidnight.setHours(0, 0, 0, 0);
+      return Math.round(
+        (parsedDate.getTime() - todayMidnight.getTime()) / (60 * 1000)
+      );
+    }
+    // Fallback: if the part before "at" doesn't look like a date, try to parse the time alone.
+    else {
+      const timeParts = timePart.split(":");
+      if (timeParts.length !== 2) {
+        return 0;
+      }
+      const hour = Number.parseInt(timeParts[0], 10);
+      const minute = Number.parseInt(timeParts[1], 10);
+      return hour * 60 + minute;
+    }
+  }
+  // Case 3: Simple time "HH:MM"
+  else {
     const parts = text.trim().split(":");
     if (parts.length !== 2) {
       return 0; // fallback if parsing fails
@@ -342,6 +665,7 @@ function createRelatedEntries(count = 3): Entry[] {
       reason: reasons[Math.floor(Math.random() * reasons.length)],
       symbol,
       shownInAlert: false,
+      verified: false,
     };
 
     entry.id = generateEntryId(entry);
@@ -361,13 +685,10 @@ function insertRelatedEntries(count = 3) {
   }
 
   const entries = createRelatedEntries(count);
-  console.log("Inserting entries:", entries);
 
   const processEntryWithDelay = (index: number) => {
     const entry = entries[index];
     if (!entry) return;
-
-    console.log("Processing entry:", index, entry);
 
     const entryElement = createEntryElement(entry);
 
@@ -388,7 +709,7 @@ function insertRelatedEntries(count = 3) {
       if (symbolContainer) {
         const symbolElement = createSymbolColumnElement(
           entry.symbol || "TEST",
-          rowIndex
+          "0"
         );
         if (symbolContainer.firstChild) {
           symbolContainer.insertBefore(
@@ -711,6 +1032,7 @@ function createRandomEntry(): Entry {
     reason: reasons[Math.floor(Math.random() * reasons.length)],
     symbol: symbols[Math.floor(Math.random() * symbols.length)],
     shownInAlert: false,
+    verified: false,
   };
 
   const id = generateEntryId(entry);
@@ -888,8 +1210,6 @@ function checkThresholdForEntry(
   threshold: number,
   cache: string[]
 ): void {
-  console.log("Checking threshold for entry:", newEntry);
-
   const symbol = newEntry.symbol || "unknown";
   const pendingAlertKey = `${symbol}-${newEntry.expiryDate}-${newEntry.type}`;
 
@@ -911,8 +1231,6 @@ function processEntriesAfterDelay(
   threshold: number,
   cache: string[]
 ): void {
-  console.log("Processing entries after delay:", newEntry);
-
   const entries: Entry[] = cache
     .map((serialized) => {
       try {
@@ -922,9 +1240,7 @@ function processEntriesAfterDelay(
         return null;
       }
     })
-    .filter((e): e is Entry => e !== null);
-
-  console.log(entries);
+    .filter((e): e is Entry => e !== null && e.verified == true);
 
   const uniqueEntriesMap = new Map<string, Entry>();
 
@@ -944,8 +1260,6 @@ function processEntriesAfterDelay(
     entriesBySymbol[symbol].push(entry);
   });
 
-  console.log(entriesBySymbol);
-
   Object.entries(entriesBySymbol).forEach(([symbol, symbolEntries]) => {
     // Skip unknown symbols
     if (symbol === "unknown") return;
@@ -959,8 +1273,6 @@ function processEntriesAfterDelay(
         e.symbol === newEntry.symbol &&
         e.shownInAlert === false
     );
-
-    console.log("Matching entries:", matching);
 
     const total = matching.reduce((sum, e) => sum + e.totalValue, 0);
 
@@ -1058,15 +1370,17 @@ function monitorPinnedColumns() {
     });
 
     const observer = new MutationObserver((mutations) => {
+      if (!settings || !settings.enabled) return;
+
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (
             node.nodeType === Node.ELEMENT_NODE &&
             (node as Element).getAttribute("role") === "row"
           ) {
-            console.log("New row added:", node);
             const row = node as HTMLElement;
             const rowIdentifiers = getRowIdentifiers(row);
+
             for (const id of rowIdentifiers) {
               const symbol = extractSymbol(row);
               if (symbol) {
@@ -1095,21 +1409,6 @@ setInterval(() => {
     cache = [];
   }, 4 * 60 * 1000);
 
-  if (USE_INITIAL_ENTRY_CUTOFF && cache.length > 0) {
-    const loadedEntries: Entry[] = cache
-      .map((serialized) => {
-        try {
-          return JSON.parse(serialized) as Entry;
-        } catch (e) {
-          console.error("Error parsing entry:", e);
-          return null;
-        }
-      })
-      .filter((e): e is Entry => e !== null);
-
-    initialCutoffTime = Math.max(...loadedEntries.map((e) => e.time));
-  }
-
   addDebugButton();
 
   if (IS_INTERESTING_OPTIONS_FLOW) {
@@ -1118,15 +1417,49 @@ setInterval(() => {
 
   waitForContainer(".MuiDataGrid-virtualScrollerRenderZone", (container) => {
     const observer = new MutationObserver((mutations) => {
+      if (!settings || !settings.enabled) return;
+
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (
             node.nodeType === Node.ELEMENT_NODE &&
             (node as Element).tagName === "DIV"
           ) {
-            console.log("New row added:", node);
             const entryElement = node as HTMLDivElement;
             const entry = extractData(entryElement);
+
+            // Check settings
+
+            if (entry.strike < settings.minStrike) {
+              console.log("Entry is too low");
+              return;
+            }
+            if (entry.strike > settings.maxStrike) {
+              console.log("Entry is too high");
+              return;
+            }
+
+            const expDateUnix = convertToUnixTimestamp(entry.expiryDate);
+            if (expDateUnix < Date.now() / 1000) {
+              console.log("Entry is expired");
+              return;
+            }
+
+            if (
+              expDateUnix >
+              Date.now() / 1000 + settings.maxExp * 24 * 60 * 60
+            ) {
+              console.log("Entry is too far in the future");
+              return;
+            }
+
+            if (
+              expDateUnix <
+              Date.now() / 1000 + settings.minExp * 24 * 60 * 60
+            ) {
+              console.log("Entry is too old");
+              return;
+            }
 
             const serialized = serialize(entry);
 
@@ -1136,15 +1469,23 @@ setInterval(() => {
               if (USE_INITIAL_ENTRY_CUTOFF) {
                 if (initialCutoffTime === null) {
                   initialCutoffTime = entry.time;
+                } else if (entry.time < 0) {
+                  return;
                 } else if (entry.time <= initialCutoffTime) {
                   return;
                 }
               }
+
+              entry.verified = true;
+              const updatedSerialized = JSON.stringify(entry);
+              cache[cache.indexOf(serialized)] = updatedSerialized;
+
               write("entry-cache", cache);
 
               // wait a short time to see if we can get the symbol
               if (IS_INTERESTING_OPTIONS_FLOW && !entry.symbol) {
                 const rowIdentifiers = getRowIdentifiers(entryElement);
+
                 if (rowIdentifiers.length > 0) {
                   setTimeout(() => {
                     for (const id of rowIdentifiers) {

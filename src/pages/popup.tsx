@@ -7,6 +7,10 @@ import { useSettingStore } from "@/lib/settings";
 
 type ViewingTab = "all" | "call" | "put";
 
+const pageTitles = {
+  main: "Ortex Alerts",
+  settings: "Settings",
+};
 const pageDescs = {
   main: "Alerts for Order Flow",
   settings: "Settings",
@@ -17,6 +21,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<ViewingTab>("all");
 
   const { settings, updateSetting } = useSettingStore();
+  console.log(settings);
 
   useEffect(() => {
     if (settings.darkMode) {
@@ -28,12 +33,9 @@ function App() {
 
   return (
     <>
-      <div
-        className="poppins p-4 w-[31rem] h-[35rem] border-4 border-black flex flex-col ${
-          dark:bg-zinc-900 dark:text-white bg-white text-black"
-      >
+      <div className="poppins p-4 w-[31rem] h-[35rem] border-4 border-black flex flex-col dark:bg-zinc-900 dark:text-white bg-white text-black">
         <div className="w-full flex flex-row justify-between">
-          <h1 className="text-xl font-bold">Ortex Alert</h1>
+          <h1 className="text-xl font-bold">{pageTitles[page]}</h1>
           <div className="flex flex-row gap-x-4 items-center">
             <button
               className="transition transform active:scale-90"
@@ -93,7 +95,7 @@ function App() {
               <TabsList className="w-full h-8 dark:bg-zinc-800">
                 <TabsTrigger
                   value="all"
-                  className="dark:data-[state=active]:bg-zinc-700 text-white"
+                  className="w-full h-8 dark:bg-zinc-800"
                 >
                   All
                 </TabsTrigger>
