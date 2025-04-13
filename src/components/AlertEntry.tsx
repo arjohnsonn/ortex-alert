@@ -1,7 +1,6 @@
 import { Clock, TriangleAlert, TrendingUp, TrendingDown } from "lucide-react";
 
 type Props = {
-  darkMode: boolean;
   type: "call" | "put";
   symbol: string;
   volume: number;
@@ -63,11 +62,7 @@ function getStrikeRange(range: number[]) {
 
 const AlertEntry = (props: Props) => {
   return (
-    <div
-      className={`w-full h-27 ${
-        props.darkMode ? "bg-zinc-800" : "bg-[#F9FAFB]"
-      } p-2.5 rounded-md mt-2`}
-    >
+    <div className="w-full h-27 dark:bg-zinc-800 bg-[#F9FAFB] p-2.5 rounded-md mt-2">
       <div className="flex flex-row justify-between">
         <div className="flex flex-row gap-x-2 items-center">
           <p

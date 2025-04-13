@@ -1,155 +1,181 @@
 import { Settings, Bell, BellOff, Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AlertEntry from "@/components/AlertEntry";
+import SettingsView from "@/pages/settings";
+import { useSettingStore } from "@/lib/settings";
+
+type ViewingTab = "all" | "call" | "put";
+
+const pageDescs = {
+  main: "Alerts for Order Flow",
+  settings: "Settings",
+};
 
 function App() {
-  const [enabled, setEnabled] = useState(true);
-  const [activeTab, setActiveTab] = useState("all");
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [page, setPage] = useState<"main" | "settings">("main");
+  const [activeTab, setActiveTab] = useState<ViewingTab>("all");
+
+  const { settings, updateSetting } = useSettingStore();
+
+  useEffect(() => {
+    if (settings.darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [settings.darkMode]);
 
   return (
     <>
       <div
-        className={`poppins p-4 w-[31rem] h-[35rem] border-4 border-black flex flex-col ${
-          isDarkMode ? "bg-zinc-900 text-white" : "bg-white text-black"
-        }`}
+        className="poppins p-4 w-[31rem] h-[35rem] border-4 border-black flex flex-col ${
+          dark:bg-zinc-900 dark:text-white bg-white text-black"
       >
         <div className="w-full flex flex-row justify-between">
           <h1 className="text-xl font-bold">Ortex Alert</h1>
           <div className="flex flex-row gap-x-4 items-center">
             <button
               className="transition transform active:scale-90"
-              onClick={() => setIsDarkMode(!isDarkMode)}
+              onClick={() => {
+                updateSetting("darkMode", !settings.darkMode);
+                if (!settings.darkMode) {
+                  document.documentElement.classList.add("dark");
+                } else {
+                  document.documentElement.classList.remove("dark");
+                }
+              }}
             >
-              {isDarkMode ? (
+              {settings.darkMode ? (
                 <Sun size={16} className="text-white border-white" />
               ) : (
                 <Moon size={16} className="text-black" />
               )}
             </button>
-            <button className="transition transform active:scale-90">
+            <button
+              className="transition transform active:scale-90"
+              onClick={() =>
+                page === "main" ? setPage("settings") : setPage("main")
+              }
+            >
               <Settings size={16} />
             </button>
           </div>
-        </div>``
-        <div className="w-full mt-1 flex flex-row justify-between">
-          <h2 className="text-xs">For Options Flow</h2>
+        </div>
+        <div className="w-full mt-2 flex flex-row justify-between">
+          <h2 className="text-xs">{pageDescs[page]}</h2>
           <button
             className={`transition transform active:scale-90 ${
-              enabled ? "text-green-500" : "text-red-500"
+              settings.enabled ? "text-green-500" : "text-red-500"
             }`}
-            onClick={() => setEnabled(!enabled)}
+            onClick={() => {
+              updateSetting("enabled", !settings.enabled);
+            }}
           >
             <div className="flex flex-row gap-x-2 items-center">
-              {enabled ? <Bell size={16} /> : <BellOff size={16} />}
-              <p className="text-xs">{enabled ? "Active" : "Inactive"}</p>
+              {settings.enabled ? <Bell size={16} /> : <BellOff size={16} />}
+              <p className="text-xs">
+                {settings.enabled ? "Active" : "Inactive"}
+              </p>
             </div>
           </button>
         </div>
 
-        <div className="mt-2 overflow-y-auto flex-1">
-          <Tabs
-            defaultValue="all"
-            value={activeTab}
-            onValueChange={setActiveTab}
-          >
-            <TabsList
-              className={`w-full h-8 ${isDarkMode ? "bg-zinc-800" : ""}`}
-            >
-              <TabsTrigger
-                value="all"
-                className={`${
-                  isDarkMode ? "data-[state=active]:bg-zinc-700 text-white" : ""
-                }`}
-              >
-                All
-              </TabsTrigger>
-              <TabsTrigger
-                value="call"
-                className={`${
-                  isDarkMode ? "data-[state=active]:bg-zinc-700 text-white" : ""
-                }`}
-              >
-                Calls
-              </TabsTrigger>
-              <TabsTrigger
-                value="put"
-                className={`${
-                  isDarkMode ? "data-[state=active]:bg-zinc-700 text-white" : ""
-                }`}
-              >
-                Puts
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent
+        {page === "main" ? (
+          <div className="mt-2 overflow-y-auto flex-1">
+            <Tabs
+              defaultValue="all"
               value={activeTab}
-              className="flex flex-col gap-y-2 overflow-y-auto"
+              onValueChange={(value: string) =>
+                setActiveTab(value as ViewingTab)
+              }
             >
-              {/* FILLER ENTRIES */}
-              <AlertEntry
-                darkMode={isDarkMode}
-                type="call"
-                symbol="AAPL"
-                date={new Date().toISOString()}
-                volume={1000}
-                entries={1}
-                time={new Date().toISOString()}
-                strikeRange={[150, 160]}
-                expires={new Date().toISOString()}
-              />
+              <TabsList className="w-full h-8 dark:bg-zinc-800">
+                <TabsTrigger
+                  value="all"
+                  className="dark:data-[state=active]:bg-zinc-700 text-white"
+                >
+                  All
+                </TabsTrigger>
+                <TabsTrigger
+                  value="call"
+                  className="w-full h-8 dark:bg-zinc-800"
+                >
+                  Calls
+                </TabsTrigger>
+                <TabsTrigger
+                  value="put"
+                  className="w-full h-8 dark:bg-zinc-800"
+                >
+                  Puts
+                </TabsTrigger>
+              </TabsList>
 
-              <AlertEntry
-                darkMode={isDarkMode}
-                type="call"
-                symbol="SPY"
-                date={new Date().toISOString()}
-                volume={500}
-                entries={2}
-                time={new Date().toISOString()}
-                strikeRange={[430, 440]}
-                expires={new Date().toISOString()}
-              />
+              <TabsContent
+                value={activeTab}
+                className="flex flex-col gap-y-2 overflow-y-auto"
+              >
+                {/* FILLER ENTRIES */}
+                <AlertEntry
+                  type="call"
+                  symbol="AAPL"
+                  date={new Date().toISOString()}
+                  volume={1000}
+                  entries={1}
+                  time={new Date().toISOString()}
+                  strikeRange={[150, 160]}
+                  expires={new Date().toISOString()}
+                />
 
-              <AlertEntry
-                darkMode={isDarkMode}
-                type="put"
-                symbol="SPY"
-                date={new Date().toISOString()}
-                volume={300}
-                entries={1}
-                time={new Date().toISOString()}
-                strikeRange={[420, 430]}
-                expires={new Date().toISOString()}
-              />
+                <AlertEntry
+                  type="call"
+                  symbol="SPY"
+                  date={new Date().toISOString()}
+                  volume={500}
+                  entries={2}
+                  time={new Date().toISOString()}
+                  strikeRange={[430, 440]}
+                  expires={new Date().toISOString()}
+                />
 
-              <AlertEntry
-                darkMode={isDarkMode}
-                type="call"
-                symbol="QQQ"
-                date={new Date().toISOString()}
-                volume={600}
-                entries={1}
-                time={new Date().toISOString()}
-                strikeRange={[350, 360]}
-                expires={new Date().toISOString()}
-              />
+                <AlertEntry
+                  type="put"
+                  symbol="SPY"
+                  date={new Date().toISOString()}
+                  volume={300}
+                  entries={1}
+                  time={new Date().toISOString()}
+                  strikeRange={[420, 430]}
+                  expires={new Date().toISOString()}
+                />
 
-              <AlertEntry
-                darkMode={isDarkMode}
-                type="put"
-                symbol="NVDA"
-                date={new Date().toISOString()}
-                volume={700}
-                entries={2}
-                time={new Date().toISOString()}
-                strikeRange={[200, 210]}
-                expires={new Date().toISOString()}
-              />
-            </TabsContent>
-          </Tabs>
-        </div>
+                <AlertEntry
+                  type="call"
+                  symbol="QQQ"
+                  date={new Date().toISOString()}
+                  volume={600}
+                  entries={1}
+                  time={new Date().toISOString()}
+                  strikeRange={[350, 360]}
+                  expires={new Date().toISOString()}
+                />
+
+                <AlertEntry
+                  type="put"
+                  symbol="NVDA"
+                  date={new Date().toISOString()}
+                  volume={700}
+                  entries={2}
+                  time={new Date().toISOString()}
+                  strikeRange={[200, 210]}
+                  expires={new Date().toISOString()}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+        ) : (
+          <SettingsView />
+        )}
       </div>
     </>
   );
