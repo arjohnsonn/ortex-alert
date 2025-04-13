@@ -49,6 +49,7 @@ export async function write(key: string, value: any): Promise<void> {
 export type Settings = {
   enabled: boolean;
   darkMode: boolean;
+  alertSound: boolean;
   valueThreshold: number;
   minStrike: number;
   maxStrike: number;
@@ -59,6 +60,7 @@ export type Settings = {
 export const defaultSettings: Settings = {
   enabled: true,
   darkMode: false,
+  alertSound: true,
   valueThreshold: 800000,
   minStrike: 100,
   maxStrike: 800,
@@ -93,7 +95,16 @@ const useSettingStore = create<{
 
 (async () => {
   const storedSettings: Settings = (await get("settings")) as Settings;
-  useSettingStore.getState().setAllSettings(storedSettings);
+
+  // Reconcile settings that are missing in storage with default settings
+  const reconciledSettings = {
+    ...defaultSettings,
+    ...storedSettings,
+  };
+
+  useSettingStore.getState().setAllSettings(reconciledSettings);
+
+  console.log("Loaded settings", reconciledSettings);
 })();
 
 export { useSettingStore };
