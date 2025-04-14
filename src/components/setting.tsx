@@ -2,6 +2,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { useSettingStore } from "@/lib/settings";
 import { Settings } from "@/lib/settings";
+import { useState, useEffect } from "react";
 
 async function sendMessage(message: any) {
   (async () => {
@@ -56,6 +57,13 @@ const BooleanSetting = (props: SettingField) => {
 
 const InputSetting = (props: InputField) => {
   const { updateSetting } = useSettingStore();
+  // Initialize local state with the incoming value.
+  const [localValue, setLocalValue] = useState(props.value);
+
+  // Optionally, update local state if the prop value ever changes.
+  useEffect(() => {
+    setLocalValue(props.value);
+  }, [props.value]);
 
   return (
     <div className="flex flex-row items-center justify-between">
@@ -64,18 +72,21 @@ const InputSetting = (props: InputField) => {
       <Input
         type="number"
         placeholder={props.placeholder.toString()}
+        value={localValue}
         onChange={(e) => {
           const value = parseInt(e.target.value);
           if (isNaN(value)) {
             return;
           }
-          props.value = value;
-          updateSetting(props.id, props.value);
-
+          // Update local state so the user sees the change immediately.
+          setLocalValue(value);
+        }}
+        onBlur={() => {
+          // When the input loses focus, update the store and send the message
+          updateSetting(props.id, localValue);
           if (props.callback) {
-            props.callback(props.value);
+            props.callback(localValue);
           }
-
           sendMessage("update");
         }}
         className="w-1/4 h-7"
