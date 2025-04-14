@@ -45,7 +45,7 @@ const Settings = () => {
       />
       <InputSetting
         title="Max Strike"
-        value={settings.minExp}
+        value={settings.maxStrike}
         id="maxStrike"
         type="string"
         placeholder={defaultSettings.maxStrike}
