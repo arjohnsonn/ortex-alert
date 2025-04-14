@@ -1203,7 +1203,6 @@ function checkThresholdForEntry(
   threshold: number,
   cache: string[]
 ): void {
-  console.log("Checking threshold for entry:", newEntry.symbol);
   const symbol = newEntry.symbol || "unknown";
   const pendingAlertKey = `${symbol}-${newEntry.expiryDate}-${newEntry.type}`;
 
@@ -1225,7 +1224,6 @@ function processEntriesAfterDelay(
   threshold: number,
   cache: string[]
 ): void {
-  console.log("Processing entries after delay:", newEntry.symbol);
   const entries: Entry[] = cache
     .map((serialized) => {
       try {
@@ -1245,7 +1243,6 @@ function processEntriesAfterDelay(
     }
   });
 
-  console.log("Unique entries map:", uniqueEntriesMap);
   const entriesBySymbol: Record<string, Entry[]> = {};
 
   uniqueEntriesMap.forEach((entry) => {
@@ -1255,8 +1252,6 @@ function processEntriesAfterDelay(
     }
     entriesBySymbol[symbol].push(entry);
   });
-
-  console.log("Entries by symbol:", entriesBySymbol);
 
   Object.entries(entriesBySymbol).forEach(([symbol, symbolEntries]) => {
     // Skip unknown symbols
@@ -1273,8 +1268,6 @@ function processEntriesAfterDelay(
 
     const total = matching.reduce((sum, e) => sum + e.totalValue, 0);
 
-    console.log(newEntry.symbol, total, threshold, matching);
-    console.log(total > threshold && matching.length >= 1);
     if (total > threshold && matching.length >= 1) {
       matching.forEach((entry) => {
         entry.shownInAlert = true;
@@ -1326,8 +1319,6 @@ function processEntriesAfterDelay(
             id: alertId,
           };
           alerts.push(newAlert);
-
-          console.log("New alert:", newAlert);
 
           playSound();
           toastSystem.showToast(toastSystem.convertAlertToFlowAlert(newAlert));
@@ -1409,12 +1400,6 @@ setInterval(() => {
             const serializedNotVerified = serialize(entry, false);
             const serializedVerified = serialize(entry, true);
 
-            console.log(
-              entry.symbol,
-              !cache.includes(serializedNotVerified) &&
-                !cache.includes(serializedVerified)
-            );
-
             if (
               !cache.includes(serializedNotVerified) &&
               !cache.includes(serializedVerified)
@@ -1431,7 +1416,6 @@ setInterval(() => {
                 }
               }
 
-              console.log("Verified entry:", entry.symbol);
               cache[cache.indexOf(serializedNotVerified)] = serializedVerified;
 
               write("entry-cache", cache);
