@@ -11,9 +11,10 @@ Usually, when mass volume is purchased and displayed on Ortex, it often indicate
 <p align="center">Data displayed in the image is purely mock data and does not represent real-world data.</p>
 
 ## Features
-- Embedded alerts within Ortex's website
+- Embedded alerts within Ortex's website based on user parameters/settings
 - Alert notification sounds
-- Modern popup design with option type
+- Modern popup design with option type filtering
+- Light/Dark Mode
 - Settings
   - Enable/Disable
   - Dark Mode
