@@ -8,6 +8,7 @@ Usually, when mass volume is purchased and displayed on Ortex, it often indicate
 **THIS IS NOT FINANCIAL ADVICE. DO YOUR OWN RESEARCH BEFORE CONDUCTING TRADES.**
 
 <img width="960" alt="Ortex Alerts thumbnail" src="https://github.com/user-attachments/assets/f16814a6-d990-4d9e-8950-b00b27022aa2" />
+<p align="center">Data displayed in the image is purely mock data and does not represent real-world data.</p>
 
 ## Features
 - Embedded alerts within Ortex's website
