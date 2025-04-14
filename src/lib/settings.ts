@@ -59,7 +59,7 @@ export type Settings = {
 
 export const defaultSettings: Settings = {
   enabled: true,
-  darkMode: false,
+  darkMode: true,
   alertSound: true,
   valueThreshold: 800000,
   minStrike: 100,
