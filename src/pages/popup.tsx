@@ -33,7 +33,7 @@ function App() {
 
   return (
     <>
-      <div className="poppins p-4 w-[31rem] h-[35rem] flex flex-col dark:bg-zinc-900 dark:text-white bg-white text-black">
+      <div className="poppins p-4 w-[31rem] border-2 border-black h-[35rem] flex flex-col dark:bg-zinc-900 dark:text-white bg-white text-black">
         <div className="w-full flex flex-row justify-between">
           <h1 className="text-xl font-bold">{pageTitles[page]}</h1>
           <div className="flex flex-row gap-x-4 items-center">
@@ -178,6 +178,11 @@ function App() {
         ) : (
           <SettingsView />
         )}
+
+        <p className="text-xxs font-light text-center pt-3">
+          This extension is <b>not</b> financial advice. Conduct your own
+          research before investing or trading.
+        </p>
       </div>
     </>
   );
