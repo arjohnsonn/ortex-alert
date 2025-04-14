@@ -16,7 +16,7 @@ type Settings = {
 
 const defaultSettings: Settings = {
   enabled: true,
-  darkMode: false,
+  darkMode: true,
   alertSound: true,
   valueThreshold: 800000,
   minStrike: 100,
@@ -621,7 +621,7 @@ function serialize(entry: Entry, verified: boolean): string {
 function createRelatedEntries(count = 3): Entry[] {
   const expiryDates = ["17 Apr", "24 Apr", "1 May", "8 May", "15 May"];
   const types = ["call", "put"] as const;
-  const reasons = ["Sweep", "Block", "Split", "Large"];
+  const reasons = ["Large"];
   const symbols = [
     "AAPL",
     "MSFT",
@@ -648,7 +648,7 @@ function createRelatedEntries(count = 3): Entry[] {
 
   for (let i = 0; i < count; i++) {
     const entry: Entry = {
-      time: currentMinutes - (i % 2),
+      time: currentMinutes,
       expiryDate,
       strike: Math.floor(Math.random() * 500) + 100,
       type,
@@ -679,15 +679,20 @@ function insertRelatedEntries(count = 3) {
 
   const entries = createRelatedEntries(count);
 
-  const processEntryWithDelay = (index: number) => {
-    const entry = entries[index];
-    if (!entry) return;
+  // Instead of using a random row index, use a local counter that increases sequentially.
+  let localRowIndex = 0;
 
+  const processEntryWithDelay = (index: number) => {
+    if (index >= entries.length) return;
+
+    const entry = entries[index];
     const entryElement = createEntryElement(entry);
 
-    const rowIndex = `test-${Date.now()}-${index}`;
+    // Use the current sequential counter for both data-rowindex and aria-rowindex.
+    const rowIndex = localRowIndex.toString();
     entryElement.setAttribute("data-rowindex", rowIndex);
     entryElement.setAttribute("aria-rowindex", rowIndex);
+    localRowIndex++;
 
     if (container.firstChild) {
       container.insertBefore(entryElement, container.firstChild);
@@ -702,7 +707,7 @@ function insertRelatedEntries(count = 3) {
       if (symbolContainer) {
         const symbolElement = createSymbolColumnElement(
           entry.symbol || "TEST",
-          "0"
+          rowIndex
         );
         if (symbolContainer.firstChild) {
           symbolContainer.insertBefore(
@@ -712,12 +717,11 @@ function insertRelatedEntries(count = 3) {
         } else {
           symbolContainer.appendChild(symbolElement);
         }
-
         symbolsByRowIndex.set(rowIndex, entry.symbol || "TEST");
       }
     }
 
-    setTimeout(() => processEntryWithDelay(index + 1), 200);
+    setTimeout(() => processEntryWithDelay(index + 1), 100);
   };
 
   processEntryWithDelay(0);
@@ -999,7 +1003,7 @@ toastSystem.init();
 function createRandomEntry(): Entry {
   const expiryDates = ["17 Apr", "24 Apr", "1 May", "8 May", "15 May"];
   const types = ["call", "put"] as const;
-  const reasons = ["Sweep", "Block", "Split", "Large"];
+  const reasons = ["Large"];
   const symbols = [
     "AAPL",
     "MSFT",
@@ -1354,6 +1358,10 @@ setInterval(() => {
           ) {
             const entryElement = node as HTMLDivElement;
             const entry = extractData(entryElement);
+
+            if (entry.type == "unknown") {
+              return;
+            }
 
             const strikeStr = entry.strike.toString();
             const dotIndex = strikeStr.indexOf(".");
