@@ -38,6 +38,7 @@ interface Entry {
   id?: string;
   shownInAlert: boolean;
   verified: boolean;
+  rowIndex?: string | null; // Added rowIndex field
 }
 
 interface Alert {
@@ -121,8 +122,6 @@ function playSound() {
 
 let initialCutoffTime: number | null = null;
 const symbolsByRowIndex: Map<string, string> = new Map();
-const pendingEntries: Map<string, { entry: Entry; cache: string[] }> =
-  new Map();
 const shownAlerts: Set<string> = new Set();
 let lastTestEntryId: string | null = null;
 
@@ -362,42 +361,6 @@ function extractSymbol(row: HTMLElement): string | undefined {
   return undefined;
 }
 
-/**
- * Get all possible row identifiers from an element
- */
-function getRowIdentifiers(element: HTMLElement | null): string[] {
-  if (!element) return [];
-
-  const identifiers: string[] = [];
-
-  const dataRowIndex = element.getAttribute("data-rowindex");
-  if (dataRowIndex) identifiers.push(dataRowIndex);
-
-  const ariaRowIndex = element.getAttribute("aria-rowindex");
-  if (ariaRowIndex) identifiers.push(ariaRowIndex);
-
-  const dataId = element.getAttribute("data-id");
-  if (dataId) identifiers.push(dataId);
-
-  return identifiers;
-}
-
-/**
- * Process any pending entries that were waiting for symbols
- */
-function processPendingEntries() {
-  pendingEntries.forEach((data, rowIndex) => {
-    if (symbolsByRowIndex.has(rowIndex)) {
-      const symbol = symbolsByRowIndex.get(rowIndex);
-      data.entry.symbol = symbol;
-
-      checkThresholdForEntry(data.entry, VALUE_THRESHOLD, data.cache);
-
-      pendingEntries.delete(rowIndex);
-    }
-  });
-}
-
 function parseClockTime(text: string): number {
   const lowerText = text.toLowerCase().trim();
 
@@ -529,8 +492,6 @@ function generateEntryId(entry: Entry): string {
     entry.size,
     entry.price,
     entry.totalValue,
-    Date.now(),
-    Math.random, // to ensure uniqueness
   ];
 
   return uniqueProps.join("-");
@@ -560,22 +521,6 @@ function extractData(entry: HTMLDivElement): Entry {
 
   const result: Partial<Entry> = {};
   const fieldElements = entry.querySelectorAll("[data-field]");
-
-  // Get row identifiers to find corresponding symbol
-  const rowIdentifiers = getRowIdentifiers(entry);
-
-  // Try to find symbol using all possible identifiers
-  if (IS_INTERESTING_OPTIONS_FLOW) {
-    for (const id of rowIdentifiers) {
-      if (symbolsByRowIndex.has(id)) {
-        result.symbol = symbolsByRowIndex.get(id);
-        break;
-      }
-    }
-  } else if (URL_SYMBOL) {
-    // For non-interesting options flow pages, use the symbol from the URL
-    result.symbol = URL_SYMBOL;
-  }
 
   fieldElements.forEach((el) => {
     const dataFieldRaw = el.getAttribute("data-field");
@@ -633,8 +578,32 @@ function extractData(entry: HTMLDivElement): Entry {
 
   const extractedEntry = result as Entry;
 
-  extractedEntry.id = generateEntryId(extractedEntry);
   extractedEntry.shownInAlert = false;
+  extractedEntry.rowIndex = entry.getAttribute("data-rowindex") || "";
+
+  // Try to find symbol using all possible identifiers
+  if (IS_INTERESTING_OPTIONS_FLOW) {
+    const pinnedContainer = document.querySelector<HTMLElement>(
+      ".MuiDataGrid-pinnedColumns--left"
+    );
+    if (pinnedContainer) {
+      const firstRow = pinnedContainer.querySelector<HTMLElement>(
+        `[data-rowindex="${extractedEntry.rowIndex}"]`
+      );
+      if (firstRow) {
+        extractedEntry.symbol = extractSymbol(firstRow);
+      }
+    }
+  } else if (URL_SYMBOL) {
+    // For non-interesting options flow pages, use the symbol from the URL
+    extractedEntry.symbol = URL_SYMBOL;
+  }
+
+  if (!extractedEntry.symbol) {
+    extractedEntry.symbol = "UNKWN";
+  }
+
+  extractedEntry.id = generateEntryId(extractedEntry);
 
   return extractedEntry;
 }
@@ -642,7 +611,10 @@ function extractData(entry: HTMLDivElement): Entry {
 /**
  * Serializes an Entry to a JSON string.
  */
-function serialize(entry: Entry): string {
+function serialize(entry: Entry, verified: boolean): string {
+  entry.rowIndex = null;
+  entry.verified = verified;
+
   return JSON.stringify(entry);
 }
 
@@ -1231,6 +1203,7 @@ function checkThresholdForEntry(
   threshold: number,
   cache: string[]
 ): void {
+  console.log("Checking threshold for entry:", newEntry.symbol);
   const symbol = newEntry.symbol || "unknown";
   const pendingAlertKey = `${symbol}-${newEntry.expiryDate}-${newEntry.type}`;
 
@@ -1243,7 +1216,7 @@ function checkThresholdForEntry(
     window.setTimeout(() => {
       processEntriesAfterDelay(newEntry, threshold, cache);
       pendingAlertTimers.delete(pendingAlertKey);
-    }, 2000)
+    }, 3500)
   );
 }
 
@@ -1252,6 +1225,7 @@ function processEntriesAfterDelay(
   threshold: number,
   cache: string[]
 ): void {
+  console.log("Processing entries after delay:", newEntry.symbol);
   const entries: Entry[] = cache
     .map((serialized) => {
       try {
@@ -1271,6 +1245,7 @@ function processEntriesAfterDelay(
     }
   });
 
+  console.log("Unique entries map:", uniqueEntriesMap);
   const entriesBySymbol: Record<string, Entry[]> = {};
 
   uniqueEntriesMap.forEach((entry) => {
@@ -1281,10 +1256,11 @@ function processEntriesAfterDelay(
     entriesBySymbol[symbol].push(entry);
   });
 
+  console.log("Entries by symbol:", entriesBySymbol);
+
   Object.entries(entriesBySymbol).forEach(([symbol, symbolEntries]) => {
     // Skip unknown symbols
     if (symbol === "unknown") return;
-
     if (newEntry.symbol !== symbol) return;
 
     const matching = symbolEntries.filter(
@@ -1297,24 +1273,9 @@ function processEntriesAfterDelay(
 
     const total = matching.reduce((sum, e) => sum + e.totalValue, 0);
 
-    if (IS_INTERESTING_OPTIONS_FLOW && !newEntry.symbol) {
-      const rowIdentifiers = getRowIdentifiers(
-        document.querySelector(
-          `[data-rowindex="${newEntry.time}"]`
-        ) as HTMLElement
-      );
-      if (rowIdentifiers.length > 0) {
-        pendingEntries.set(rowIdentifiers[0], { entry: newEntry, cache });
-
-        setTimeout(() => {
-          processPendingEntries();
-        }, 500);
-
-        return;
-      }
-    }
-
-    if (total > threshold && matching.length > 1) {
+    console.log(newEntry.symbol, total, threshold, matching);
+    console.log(total > threshold && matching.length >= 1);
+    if (total > threshold && matching.length >= 1) {
       matching.forEach((entry) => {
         entry.shownInAlert = true;
       });
@@ -1366,58 +1327,14 @@ function processEntriesAfterDelay(
           };
           alerts.push(newAlert);
 
+          console.log("New alert:", newAlert);
+
           playSound();
           toastSystem.showToast(toastSystem.convertAlertToFlowAlert(newAlert));
         }
         write("alerts", alerts);
       });
     }
-  });
-}
-
-function monitorPinnedColumns() {
-  if (!IS_INTERESTING_OPTIONS_FLOW) return;
-
-  waitForContainer(".MuiDataGrid-pinnedColumns--left", (container) => {
-    const rows = container.querySelectorAll('[role="row"]');
-    rows.forEach((row) => {
-      if (row instanceof HTMLElement) {
-        const rowIdentifiers = getRowIdentifiers(row);
-        for (const id of rowIdentifiers) {
-          const symbol = extractSymbol(row);
-          if (symbol) {
-            symbolsByRowIndex.set(id, symbol);
-          }
-        }
-      }
-    });
-
-    const observer = new MutationObserver((mutations) => {
-      if (!settings || !settings.enabled) return;
-
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (
-            node.nodeType === Node.ELEMENT_NODE &&
-            (node as Element).getAttribute("role") === "row"
-          ) {
-            const row = node as HTMLElement;
-            const rowIdentifiers = getRowIdentifiers(row);
-
-            for (const id of rowIdentifiers) {
-              const symbol = extractSymbol(row);
-              if (symbol) {
-                symbolsByRowIndex.set(id, symbol);
-
-                processPendingEntries();
-              }
-            }
-          }
-        });
-      });
-    });
-
-    observer.observe(container, { childList: true, subtree: true });
   });
 }
 
@@ -1434,10 +1351,6 @@ setInterval(() => {
 
   addDebugButton();
 
-  if (IS_INTERESTING_OPTIONS_FLOW) {
-    monitorPinnedColumns();
-  }
-
   waitForContainer(".MuiDataGrid-virtualScrollerRenderZone", (container) => {
     const observer = new MutationObserver((mutations) => {
       if (!settings || !settings.enabled) return;
@@ -1451,20 +1364,31 @@ setInterval(() => {
             const entryElement = node as HTMLDivElement;
             const entry = extractData(entryElement);
 
+            const strikeStr = entry.strike.toString();
+            const dotIndex = strikeStr.indexOf(".");
+            if (
+              dotIndex !== -1 &&
+              strikeStr.length - dotIndex - 1 === 2 &&
+              strikeStr.substring(dotIndex) !== ".5"
+            ) {
+              return;
+            }
+
+            if (entry.size % 1 !== 0) {
+              return;
+            }
+
             // Check settings
 
             if (entry.strike < settings.minStrike) {
-              console.log("Entry is too low");
               return;
             }
             if (entry.strike > settings.maxStrike) {
-              console.log("Entry is too high");
               return;
             }
 
             const expDateUnix = convertToUnixTimestamp(entry.expiryDate);
             if (expDateUnix < Date.now() / 1000) {
-              console.log("Entry is expired");
               return;
             }
 
@@ -1472,7 +1396,6 @@ setInterval(() => {
               expDateUnix >
               Date.now() / 1000 + settings.maxExp * 24 * 60 * 60
             ) {
-              console.log("Entry is too far in the future");
               return;
             }
 
@@ -1480,52 +1403,40 @@ setInterval(() => {
               expDateUnix <
               Date.now() / 1000 + settings.minExp * 24 * 60 * 60
             ) {
-              console.log("Entry is too old");
               return;
             }
 
-            const serialized = serialize(entry);
+            const serializedNotVerified = serialize(entry, false);
+            const serializedVerified = serialize(entry, true);
 
-            if (!cache.includes(serialized)) {
-              cache.push(serialized);
+            console.log(
+              entry.symbol,
+              !cache.includes(serializedNotVerified) &&
+                !cache.includes(serializedVerified)
+            );
+
+            if (
+              !cache.includes(serializedNotVerified) &&
+              !cache.includes(serializedVerified)
+            ) {
+              cache.push(serializedNotVerified);
 
               if (USE_INITIAL_ENTRY_CUTOFF) {
                 if (initialCutoffTime === null) {
                   initialCutoffTime = entry.time;
                 } else if (entry.time < 0) {
                   return;
-                } else if (entry.time <= initialCutoffTime) {
+                } else if (entry.time < initialCutoffTime) {
                   return;
                 }
               }
 
-              entry.verified = true;
-              const updatedSerialized = JSON.stringify(entry);
-              cache[cache.indexOf(serialized)] = updatedSerialized;
+              console.log("Verified entry:", entry.symbol);
+              cache[cache.indexOf(serializedNotVerified)] = serializedVerified;
 
               write("entry-cache", cache);
 
-              // wait a short time to see if we can get the symbol
-              if (IS_INTERESTING_OPTIONS_FLOW && !entry.symbol) {
-                const rowIdentifiers = getRowIdentifiers(entryElement);
-
-                if (rowIdentifiers.length > 0) {
-                  setTimeout(() => {
-                    for (const id of rowIdentifiers) {
-                      if (symbolsByRowIndex.has(id)) {
-                        entry.symbol = symbolsByRowIndex.get(id);
-                        break;
-                      }
-                    }
-
-                    checkThresholdForEntry(entry, VALUE_THRESHOLD, cache);
-                  }, 100);
-                } else {
-                  checkThresholdForEntry(entry, VALUE_THRESHOLD, cache);
-                }
-              } else {
-                checkThresholdForEntry(entry, VALUE_THRESHOLD, cache);
-              }
+              checkThresholdForEntry(entry, VALUE_THRESHOLD, cache);
             }
           }
         });
