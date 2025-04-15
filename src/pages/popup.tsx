@@ -4,6 +4,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AlertEntry from "@/components/AlertEntry";
 import SettingsView from "@/pages/settings";
 import { useSettingStore } from "@/lib/settings";
+import { Button } from "@/components/ui/button";
+
+type SavedEntry = {
+  expiryDate: string;
+  type: string;
+  totalValue: number;
+  entries: any[];
+  timestamp: string;
+  symbol: string;
+  time: number;
+  strikeRange: number[];
+};
 
 type ViewingTab = "all" | "call" | "put";
 
@@ -13,15 +25,26 @@ const pageTitles = {
 };
 const pageDescs = {
   main: "Alerts for Order Flow",
-  settings: "Settings",
+  settings: "Enabled",
 };
 
 function App() {
   const [page, setPage] = useState<"main" | "settings">("main");
   const [activeTab, setActiveTab] = useState<ViewingTab>("all");
+  const [savedAlerts, setSavedAlerts] = useState<any>([]);
 
   const { settings, updateSetting } = useSettingStore();
-  console.log(settings);
+
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      const alerts = await chrome.runtime.sendMessage({
+        type: "get",
+        data: "alerts",
+      });
+      setSavedAlerts(alerts);
+    };
+    fetchAlerts();
+  }, []);
 
   useEffect(() => {
     if (settings.darkMode) {
@@ -37,6 +60,18 @@ function App() {
         <div className="w-full flex flex-row justify-between">
           <h1 className="text-xl font-bold">{pageTitles[page]}</h1>
           <div className="flex flex-row gap-x-4 items-center">
+            <Button
+              onClick={async () => {
+                setSavedAlerts([]);
+                await chrome.runtime.sendMessage({
+                  type: "write",
+                  data: { key: "alerts", value: [] },
+                });
+              }}
+              className="h-6 w-12 text-xs text-center transition transform duration-200 active:scale-90"
+            >
+              Clear
+            </Button>
             <button
               className="transition transform active:scale-90"
               onClick={() => {
@@ -54,6 +89,7 @@ function App() {
                 <Moon size={16} className="text-black" />
               )}
             </button>
+
             <button
               className="transition transform active:scale-90"
               onClick={() =>
@@ -117,61 +153,28 @@ function App() {
                 value={activeTab}
                 className="flex flex-col gap-y-2 overflow-y-auto"
               >
-                {/* FILLER ENTRIES */}
-                <AlertEntry
-                  type="call"
-                  symbol="AAPL"
-                  date={new Date().toISOString()}
-                  volume={1000}
-                  entries={1}
-                  time={new Date().toISOString()}
-                  strikeRange={[150, 160]}
-                  expires={new Date().toISOString()}
-                />
-
-                <AlertEntry
-                  type="call"
-                  symbol="SPY"
-                  date={new Date().toISOString()}
-                  volume={500}
-                  entries={2}
-                  time={new Date().toISOString()}
-                  strikeRange={[430, 440]}
-                  expires={new Date().toISOString()}
-                />
-
-                <AlertEntry
-                  type="put"
-                  symbol="SPY"
-                  date={new Date().toISOString()}
-                  volume={300}
-                  entries={1}
-                  time={new Date().toISOString()}
-                  strikeRange={[420, 430]}
-                  expires={new Date().toISOString()}
-                />
-
-                <AlertEntry
-                  type="call"
-                  symbol="QQQ"
-                  date={new Date().toISOString()}
-                  volume={600}
-                  entries={1}
-                  time={new Date().toISOString()}
-                  strikeRange={[350, 360]}
-                  expires={new Date().toISOString()}
-                />
-
-                <AlertEntry
-                  type="put"
-                  symbol="NVDA"
-                  date={new Date().toISOString()}
-                  volume={700}
-                  entries={2}
-                  time={new Date().toISOString()}
-                  strikeRange={[200, 210]}
-                  expires={new Date().toISOString()}
-                />
+                {savedAlerts &&
+                  savedAlerts
+                    .slice()
+                    .reverse()
+                    .filter((alert: SavedEntry) =>
+                      activeTab === "all"
+                        ? true
+                        : alert.type.toLowerCase() === activeTab
+                    )
+                    .map((alert: SavedEntry, idx: number) => (
+                      <AlertEntry
+                        key={idx}
+                        type={alert.type.toLowerCase() as "call" | "put"}
+                        symbol={alert.symbol}
+                        date={alert.timestamp.toString()}
+                        value={alert.totalValue}
+                        entries={alert.entries.length}
+                        time={alert.timestamp.toString()}
+                        strikeRange={alert.strikeRange}
+                        expires={alert.expiryDate}
+                      />
+                    ))}
               </TabsContent>
             </Tabs>
           </div>
