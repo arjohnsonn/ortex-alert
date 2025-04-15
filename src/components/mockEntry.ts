@@ -1,4 +1,3 @@
-
 type Props = {
   timeDisplay: string;
   expiryDate: string;
@@ -54,7 +53,7 @@ min-height: auto; max-height: none;">
       <div class="jsx-1989257464 TableCell_TableCell__ofBYs obfuscated" style="margin: inherit;">
         <div class="jsx-1989257464 TableCell_container__RJgLi false ">
           <div class="jsx-1989257464 obfuscated" style="cursor: initial;">
-            <p class="jsx-1989257464">${type === "call" ? "C" : "P"}</p>
+            <p class="jsx-1989257464">${type === "C" ? "C" : "P"}</p>
           </div>
         </div>
       </div>
