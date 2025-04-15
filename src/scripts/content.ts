@@ -7,6 +7,8 @@ type Settings = {
   enabled: boolean;
   darkMode: boolean;
   alertSound: boolean;
+  dateFormat: boolean;
+  dateWords: boolean;
   valueThreshold: number;
   minStrike: number;
   maxStrike: number;
@@ -18,6 +20,8 @@ const defaultSettings: Settings = {
   enabled: true,
   darkMode: true,
   alertSound: true,
+  dateFormat: true,
+  dateWords: true,
   valueThreshold: 800000,
   minStrike: 100,
   maxStrike: 800,
@@ -81,6 +85,19 @@ let settings: Settings;
 
   VALUE_THRESHOLD = settings.valueThreshold;
   console.log("Settings loaded:", settings);
+})();
+
+(async () => {
+  const LAST_CACHE_CLEAR_KEY = "lastCacheClearDay";
+  const currentDay = new Date().toDateString();
+
+  const lastClear = (await get("lastCacheClearDay")) as string | undefined;
+  console.log("Last cache clear:", lastClear);
+  if (lastClear !== currentDay) {
+    console.log("New day detected, clearing entry cache.");
+    await write("entry-cache", []);
+    await write(LAST_CACHE_CLEAR_KEY, currentDay);
+  }
 })();
 
 chrome.runtime.onMessage.addListener(async function () {
@@ -1063,7 +1080,7 @@ function createEntryElement(entry: Entry): HTMLDivElement {
     timeDisplay: timeDisplay,
     expiryDate: entry.expiryDate,
     strike: entry.strike,
-    type: entry.type === "call" ? "C" : "P",
+    type: entry.type == "call" ? "C" : "P",
     size: entry.size,
     price: entry.price,
     formattedTotalValue: formattedTotalValue,
@@ -1301,8 +1318,18 @@ function processEntriesAfterDelay(
           totalValue: total,
           entries: matching,
           timestamp: Date.now(),
-          symbol, // Include the symbol
+          symbol,
+          time: 0,
+          strikeRange: null,
         };
+
+        const strikes = matching.map((entry) => entry.strike);
+        const minStrike = Math.min(...strikes);
+        const maxStrike = Math.max(...strikes);
+        Object.assign(alertWithoutId, { strikeRange: [minStrike, maxStrike] });
+
+        alertWithoutId.time =
+          Math.min(...matching.map((entry) => entry.time)) || 0;
 
         const alertId = generateAlertId(alertWithoutId);
 
