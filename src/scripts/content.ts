@@ -53,6 +53,12 @@ interface Alert {
   timestamp: number; // unix ms timestamp
   symbol?: string; // Added symbol field
   id: string;
+  metadata: {
+    wordDate: string;
+    date1: string;
+    date2: string;
+    date3: string;
+  };
 }
 
 // SETTINGS
@@ -338,7 +344,69 @@ function convertToUnixTimestamp(input: string): number {
   }
 
   // Convert the date's milliseconds to a Unix timestamp (seconds)
-  return Math.floor(date.getTime() / 1000);
+  return Math.floor(date.getTime());
+}
+
+function getAlertDate(date: string, format: boolean, words: boolean): string {
+  // Create a Date instance from a timestamp string.
+  const d = new Date(parseInt(date, 10));
+  const day = d.getDate();
+  const year = d.getFullYear();
+  const monthIndex = d.getMonth(); // zero-based
+
+  // Prepare numeric representations (with 2-digit padding)
+  const monthNumeric =
+    monthIndex + 1 < 10 ? "0" + (monthIndex + 1) : String(monthIndex + 1);
+  const dayNumeric = day < 10 ? "0" + day : String(day);
+
+  // Array of full month names.
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  // Helper function to compute the ordinal suffix for the day.
+  function getOrdinalSuffix(n: number): string {
+    if (n % 100 >= 11 && n % 100 <= 13) {
+      return "th";
+    }
+    switch (n % 10) {
+      case 1:
+        return "st";
+      case 2:
+        return "nd";
+      case 3:
+        return "rd";
+      default:
+        return "th";
+    }
+  }
+
+  // Determine the output string based on the flags.
+  if (format) {
+    if (words) {
+      // When words are used, include the ordinal suffix in the day.
+      return `${monthNames[monthIndex]} ${day}${getOrdinalSuffix(
+        day
+      )}, ${year}`;
+    } else {
+      // Use numeric month-day-year format with dashes.
+      return `${monthNumeric}-${dayNumeric}-${year}`;
+    }
+  } else {
+    // Regardless of words flag, return numeric format in YYYY-MM-DD.
+    return `${year}-${monthNumeric}-${dayNumeric}`;
+  }
 }
 
 /**
@@ -551,7 +619,7 @@ function extractData(entry: HTMLDivElement): Entry {
         } else if (text.toLowerCase().includes("m")) {
           num *= 1000000;
         }
-        result[key] = num;
+        result[key] = Math.floor(num + 0.5);
         break;
       }
       case "expiryDate": {
@@ -1285,6 +1353,28 @@ function processEntriesAfterDelay(
           symbol,
           time: 0,
           strikeRange: null,
+          metadata: {
+            wordDate: getAlertDate(
+              convertToUnixTimestamp(newEntry.expiryDate).toString(),
+              true,
+              true
+            ),
+            date1: getAlertDate(
+              convertToUnixTimestamp(newEntry.expiryDate).toString(),
+              true,
+              false
+            ),
+            date2: getAlertDate(
+              convertToUnixTimestamp(newEntry.expiryDate).toString(),
+              false,
+              false
+            ),
+            date3: getAlertDate(
+              convertToUnixTimestamp(newEntry.expiryDate).toString(),
+              false,
+              true
+            ),
+          },
         };
 
         const strikes = matching.map((entry) => entry.strike);
@@ -1374,20 +1464,20 @@ function processEntriesAfterDelay(
             }
 
             const expDateUnix = convertToUnixTimestamp(entry.expiryDate);
-            if (expDateUnix < Date.now() / 1000) {
+            if (expDateUnix < Date.now()) {
               return;
             }
 
             if (
               expDateUnix >
-              Date.now() / 1000 + settings.maxExp * 24 * 60 * 60
+              Date.now() + settings.maxExp * 24 * 60 * 60 * 1000
             ) {
               return;
             }
 
             if (
               expDateUnix <
-              Date.now() / 1000 + settings.minExp * 24 * 60 * 60
+              Date.now() + settings.minExp * 24 * 60 * 60 * 1000
             ) {
               return;
             }
