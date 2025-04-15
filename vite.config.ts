@@ -18,7 +18,7 @@ export default defineConfig({
         popup: "index.html",
         // landing: "src/html/landing.html",
         content: "src/scripts/content.ts",
-        // background: "src/scripts/background.ts",
+        background: "src/scripts/background.ts",
         //   script: "src/scripts/script.ts",
       },
       output: {
