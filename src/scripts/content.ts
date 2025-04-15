@@ -40,8 +40,8 @@ interface Entry {
   reason: string;
   symbol?: string;
   id?: string;
-  shownInAlert: boolean;
-  verified: boolean;
+  shownInAlert: boolean | undefined;
+  verified: boolean | undefined;
   rowIndex?: string | null; // Added rowIndex field
 }
 
@@ -85,19 +85,6 @@ let settings: Settings;
 
   VALUE_THRESHOLD = settings.valueThreshold;
   console.log("Settings loaded:", settings);
-})();
-
-(async () => {
-  const LAST_CACHE_CLEAR_KEY = "lastCacheClearDay";
-  const currentDay = new Date().toDateString();
-
-  const lastClear = (await get("lastCacheClearDay")) as string | undefined;
-  console.log("Last cache clear:", lastClear);
-  if (lastClear !== currentDay) {
-    console.log("New day detected, clearing entry cache.");
-    await write("entry-cache", []);
-    await write(LAST_CACHE_CLEAR_KEY, currentDay);
-  }
 })();
 
 chrome.runtime.onMessage.addListener(async function () {
@@ -509,6 +496,8 @@ function generateEntryId(entry: Entry): string {
     entry.size,
     entry.price,
     entry.totalValue,
+    entry.reason,
+    entry.time,
   ];
 
   return uniqueProps.join("-");
@@ -585,7 +574,7 @@ function extractData(entry: HTMLDivElement): Entry {
         break;
       }
       case "shownInAlert": {
-        result[key] = false;
+        result[key] = undefined;
         break;
       }
       default:
@@ -595,7 +584,7 @@ function extractData(entry: HTMLDivElement): Entry {
 
   const extractedEntry = result as Entry;
 
-  extractedEntry.shownInAlert = false;
+  extractedEntry.shownInAlert = undefined;
   extractedEntry.rowIndex = entry.getAttribute("data-rowindex") || "";
 
   // Try to find symbol using all possible identifiers
@@ -623,16 +612,6 @@ function extractData(entry: HTMLDivElement): Entry {
   extractedEntry.id = generateEntryId(extractedEntry);
 
   return extractedEntry;
-}
-
-/**
- * Serializes an Entry to a JSON string.
- */
-function serialize(entry: Entry, verified: boolean): string {
-  entry.rowIndex = null;
-  entry.verified = verified;
-
-  return JSON.stringify(entry);
 }
 
 function createRelatedEntries(count = 3): Entry[] {
@@ -674,8 +653,8 @@ function createRelatedEntries(count = 3): Entry[] {
       totalValue: Math.floor(Math.random() * 100000) + 10000,
       reason: reasons[Math.floor(Math.random() * reasons.length)],
       symbol,
-      shownInAlert: false,
-      verified: false,
+      shownInAlert: undefined,
+      verified: undefined,
     };
 
     entry.id = generateEntryId(entry);
@@ -880,7 +859,7 @@ class OptionsFlowToastSystem {
         <div class="options-flow-toast-row">
           <div class="flex-row">
             ${alertIcon}
-            <span>Volume: <span class="options-flow-toast-volume">${alert.totalVolume.toLocaleString()}</span></span>
+            <span>Value: <span class="options-flow-toast-volume">${alert.totalVolume.toLocaleString()}</span></span>
           </div>
           <div>Entries: <strong>${alert.entries}</strong></div>
         </div>
@@ -1045,8 +1024,8 @@ function createRandomEntry(): Entry {
     totalValue: Math.floor(Math.random() * 100000) + 10000,
     reason: reasons[Math.floor(Math.random() * reasons.length)],
     symbol: symbols[Math.floor(Math.random() * symbols.length)],
-    shownInAlert: false,
-    verified: false,
+    shownInAlert: undefined,
+    verified: undefined,
   };
 
   const id = generateEntryId(entry);
@@ -1222,7 +1201,7 @@ const pendingAlertTimers: Map<string, number> = new Map();
 function checkThresholdForEntry(
   newEntry: Entry,
   threshold: number,
-  cache: string[]
+  cache: Entry[]
 ): void {
   const symbol = newEntry.symbol || "unknown";
   const pendingAlertKey = `${symbol}-${newEntry.expiryDate}-${newEntry.type}`;
@@ -1243,18 +1222,9 @@ function checkThresholdForEntry(
 function processEntriesAfterDelay(
   newEntry: Entry,
   threshold: number,
-  cache: string[]
+  cache: Entry[]
 ): void {
-  const entries: Entry[] = cache
-    .map((serialized) => {
-      try {
-        return JSON.parse(serialized) as Entry;
-      } catch (e) {
-        console.error("Error parsing entry:", e);
-        return null;
-      }
-    })
-    .filter((e): e is Entry => e !== null && e.verified == true);
+  const entries: Entry[] = cache.filter((entry) => entry.verified === true);
 
   const uniqueEntriesMap = new Map<string, Entry>();
 
@@ -1284,7 +1254,7 @@ function processEntriesAfterDelay(
         e.expiryDate === newEntry.expiryDate &&
         e.type === newEntry.type &&
         e.symbol === newEntry.symbol &&
-        e.shownInAlert === false
+        !e.shownInAlert
     );
 
     const total = matching.reduce((sum, e) => sum + e.totalValue, 0);
@@ -1295,17 +1265,11 @@ function processEntriesAfterDelay(
       });
 
       matching.forEach((entry) => {
-        const index = cache.findIndex((serialized) => {
-          try {
-            const parsed = JSON.parse(serialized) as Entry;
-            return parsed.id === entry.id;
-          } catch (e) {
-            console.error("Error parsing entry:", e);
-            return false;
-          }
-        });
+        const index = cache.findIndex(
+          (cachedEntry) => cachedEntry.id === entry.id
+        );
         if (index !== -1) {
-          cache[index] = JSON.stringify(entry);
+          cache[index] = entry;
         }
       });
 
@@ -1340,7 +1304,6 @@ function processEntriesAfterDelay(
           currentAlert.totalValue = total;
           currentAlert.timestamp = Date.now();
 
-          playSound();
           toastSystem.showToast(
             toastSystem.convertAlertToFlowAlert(currentAlert)
           );
@@ -1351,6 +1314,7 @@ function processEntriesAfterDelay(
           };
           alerts.push(newAlert);
 
+          // console.log("playing sound", newAlert.symbol, newAlert);
           playSound();
           toastSystem.showToast(toastSystem.convertAlertToFlowAlert(newAlert));
         }
@@ -1360,16 +1324,12 @@ function processEntriesAfterDelay(
   });
 }
 
-setInterval(() => {
-  shownAlerts.clear();
-}, 3 * 60 * 1000);
-
 (async () => {
-  let cache: string[] = [];
+  let cache: Entry[] = [];
 
   setInterval(() => {
     cache = [];
-  }, 4 * 60 * 1000);
+  }, 1000 * 60 * 5);
 
   addDebugButton();
 
@@ -1432,14 +1392,9 @@ setInterval(() => {
               return;
             }
 
-            const serializedNotVerified = serialize(entry, false);
-            const serializedVerified = serialize(entry, true);
-
-            if (
-              !cache.includes(serializedNotVerified) &&
-              !cache.includes(serializedVerified)
-            ) {
-              cache.push(serializedNotVerified);
+            if (!cache.some((cachedEntry) => cachedEntry.id === entry.id)) {
+              // console.log("inserted", entry.symbol, entry);
+              cache.push(entry);
 
               if (USE_INITIAL_ENTRY_CUTOFF) {
                 if (initialCutoffTime === null) {
@@ -1451,9 +1406,8 @@ setInterval(() => {
                 }
               }
 
-              cache[cache.indexOf(serializedNotVerified)] = serializedVerified;
-
-              write("entry-cache", cache);
+              entry.verified = true;
+              cache[cache.indexOf(entry)] = entry;
 
               checkThresholdForEntry(entry, VALUE_THRESHOLD, cache);
             }
