@@ -23,15 +23,24 @@ const Settings = () => {
         value={settings.alertSound}
         id="alertSound"
       />
+      <BooleanSetting
+        title={`${
+          settings.dateFormat ? "MM DD, YYYY" : "YYYY-MM-DD"
+        } Date Format`}
+        value={settings.dateFormat}
+        id="dateFormat"
+      />
+      <BooleanSetting
+        title="Use Words for Date"
+        value={settings.dateWords}
+        id="dateWords"
+      />
       <InputSetting
         title="Value Threshold"
         value={settings.valueThreshold}
         id="valueThreshold"
         type="string"
         placeholder={defaultSettings.valueThreshold}
-        callback={(value: number) => {
-          console.log(value);
-        }}
       />
       <InputSetting
         title="Min Strike"
@@ -39,9 +48,6 @@ const Settings = () => {
         id="minStrike"
         type="string"
         placeholder={defaultSettings.minStrike}
-        callback={(value: number) => {
-          console.log(value);
-        }}
       />
       <InputSetting
         title="Max Strike"

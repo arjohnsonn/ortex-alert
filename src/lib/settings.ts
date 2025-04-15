@@ -50,6 +50,8 @@ export type Settings = {
   enabled: boolean;
   darkMode: boolean;
   alertSound: boolean;
+  dateFormat: boolean;
+  dateWords: boolean;
   valueThreshold: number;
   minStrike: number;
   maxStrike: number;
@@ -61,6 +63,8 @@ export const defaultSettings: Settings = {
   enabled: true,
   darkMode: true,
   alertSound: true,
+  dateFormat: true,
+  dateWords: true,
   valueThreshold: 800000,
   minStrike: 100,
   maxStrike: 800,
