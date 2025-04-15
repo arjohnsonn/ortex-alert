@@ -6,6 +6,7 @@ import SettingsView from "@/pages/settings";
 import { useSettingStore } from "@/lib/settings";
 import { Button } from "@/components/ui/button";
 import { sendMessage } from "@/components/setting";
+import { Input } from "@/components/ui/input";
 
 type SavedEntry = {
   expiryDate: string;
@@ -16,6 +17,12 @@ type SavedEntry = {
   symbol: string;
   time: number;
   strikeRange: number[];
+  metadata: {
+    wordDate: string;
+    date1: string;
+    date2: string;
+    date3: string;
+  };
 };
 
 type ViewingTab = "all" | "call" | "put";
@@ -33,6 +40,7 @@ function App() {
   const [page, setPage] = useState<"main" | "settings">("main");
   const [activeTab, setActiveTab] = useState<ViewingTab>("all");
   const [savedAlerts, setSavedAlerts] = useState<any>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { settings, updateSetting } = useSettingStore();
 
@@ -124,6 +132,16 @@ function App() {
 
         {page === "main" ? (
           <div className="mt-2 overflow-y-auto flex-1">
+            <div className="pb-2 sticky top-0 bg-white dark:bg-zinc-900 z-10">
+              <Input
+                type="text"
+                placeholder="Search using any contract data..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full h-6 text-xs"
+              />
+            </div>
+
             <Tabs
               defaultValue="all"
               value={activeTab}
@@ -165,6 +183,26 @@ function App() {
                         ? true
                         : alert.type.toLowerCase() === activeTab
                     )
+                    .filter((alert: SavedEntry) => {
+                      if (!searchTerm) return true;
+                      const term = searchTerm.toLowerCase();
+                      return Object.keys(alert).some((key) => {
+                        if (key === "metadata") {
+                          return Object.keys(alert.metadata).some((metaKey) =>
+                            alert.metadata[
+                              metaKey as keyof typeof alert.metadata
+                            ]
+                              .toString()
+                              .toLowerCase()
+                              .includes(term)
+                          );
+                        }
+                        return (alert as any)[key]
+                          .toString()
+                          .toLowerCase()
+                          .includes(term);
+                      });
+                    })
                     .map((alert: SavedEntry, idx: number) => (
                       <AlertEntry
                         key={idx}
