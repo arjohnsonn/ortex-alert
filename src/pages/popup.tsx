@@ -5,6 +5,7 @@ import AlertEntry from "@/components/AlertEntry";
 import SettingsView from "@/pages/settings";
 import { useSettingStore } from "@/lib/settings";
 import { Button } from "@/components/ui/button";
+import { sendMessage } from "@/components/setting";
 
 type SavedEntry = {
   expiryDate: string;
@@ -76,6 +77,7 @@ function App() {
               className="transition transform active:scale-90"
               onClick={() => {
                 updateSetting("darkMode", !settings.darkMode);
+                sendMessage("update");
                 if (!settings.darkMode) {
                   document.documentElement.classList.add("dark");
                 } else {
@@ -108,6 +110,7 @@ function App() {
             }`}
             onClick={() => {
               updateSetting("enabled", !settings.enabled);
+              sendMessage("update");
             }}
           >
             <div className="flex flex-row gap-x-2 items-center">

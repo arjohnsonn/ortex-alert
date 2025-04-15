@@ -4,7 +4,7 @@ import { useSettingStore } from "@/lib/settings";
 import { Settings } from "@/lib/settings";
 import { useState, useEffect } from "react";
 
-async function sendMessage(message: any) {
+export async function sendMessage(message: any) {
   (async () => {
     try {
       const [tab] = await chrome.tabs.query({
