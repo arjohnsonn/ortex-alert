@@ -42,6 +42,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<ViewingTab>("all");
   const [savedAlerts, setSavedAlerts] = useState<any>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [valueFilter, setValueFilter] = useState<number | null>(null);
 
   const { settings, updateSetting } = useSettingStore();
 
@@ -133,12 +134,23 @@ function App() {
 
         {page === "main" ? (
           <div className="mt-2 overflow-y-auto flex-1">
-            <div className="pb-2 sticky top-0 bg-white dark:bg-zinc-900 z-10">
+            <div className="pb-2 sticky flex gap-x-2 flex-row top-0 bg-white dark:bg-zinc-900 z-10">
               <Input
                 type="text"
-                placeholder="Search using any contract data..."
+                placeholder="Search using any contract data"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full h-6 text-xs"
+              />
+              <Input
+                type="number"
+                placeholder="Filter by total value or more"
+                value={valueFilter ?? ""}
+                onChange={(e) =>
+                  setValueFilter(
+                    e.target.value === "" ? null : Number(e.target.value)
+                  )
+                }
                 className="w-full h-6 text-xs"
               />
             </div>
@@ -203,6 +215,10 @@ function App() {
                           .toLowerCase()
                           .includes(term);
                       });
+                    })
+                    .filter((alert: SavedEntry) => {
+                      if (valueFilter === null) return true;
+                      return alert.totalValue >= valueFilter;
                     })
                     .map((alert: SavedEntry, idx: number) => (
                       <AlertEntry
