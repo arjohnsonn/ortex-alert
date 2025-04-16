@@ -2,9 +2,13 @@
   "manifest_version": 3,
   "name": "Ortex Alert",
   "version": "1.0.0",
-  "description": "Alerts when Ortex's Interesting Options Flow shows abnormally high volume",
+  "description": "Alerts when Ortex's order flow meets certain criteria",
+  "icons": {
+    "128": "images/icon128.png"
+  },
   "action": {
-    "default_popup": "index.html"
+    "default_popup": "index.html",
+    "default_icon": "images/icon128.png"
   },
   "permissions": ["storage"],
   "content_scripts": [
