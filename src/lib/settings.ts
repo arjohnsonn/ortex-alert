@@ -57,6 +57,7 @@ export type Settings = {
   maxStrike: number;
   minExp: number;
   maxExp: number;
+  debug: boolean;
 };
 
 export const defaultSettings: Settings = {
@@ -70,6 +71,7 @@ export const defaultSettings: Settings = {
   maxStrike: 800,
   minExp: 0,
   maxExp: 365,
+  debug: false,
 };
 
 const initialSettings: Settings = defaultSettings;

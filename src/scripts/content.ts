@@ -14,6 +14,7 @@ type Settings = {
   maxStrike: number;
   minExp: number;
   maxExp: number;
+  debug: boolean;
 };
 
 const defaultSettings: Settings = {
@@ -27,6 +28,7 @@ const defaultSettings: Settings = {
   maxStrike: 800,
   minExp: 0,
   maxExp: 365,
+  debug: false,
 };
 
 interface Entry {
@@ -90,6 +92,16 @@ let settings: Settings;
   }
 
   VALUE_THRESHOLD = settings.valueThreshold;
+  const element = document.getElementById(
+    "options-flow-debug-button-container"
+  ) as HTMLElement;
+
+  if (!settings.debug) {
+    element.style.display = "none";
+  } else {
+    element.style.display = "block";
+  }
+
   console.log("Settings loaded:", settings);
 })();
 
@@ -101,6 +113,17 @@ chrome.runtime.onMessage.addListener(async function () {
   }
 
   VALUE_THRESHOLD = settings.valueThreshold;
+
+  const element = document.getElementById(
+    "options-flow-debug-button-container"
+  ) as HTMLElement;
+
+  if (!settings.debug) {
+    element.style.display = "none";
+  } else {
+    element.style.display = "block";
+  }
+
   console.log("Settings updated:", settings);
 });
 
@@ -619,7 +642,12 @@ function extractData(entry: HTMLDivElement): Entry {
         } else if (text.toLowerCase().includes("m")) {
           num *= 1000000;
         }
-        result[key] = Math.floor(num + 0.5);
+
+        if (key == "price" || key == "totalValue") {
+          result[key] = Math.floor(num + 0.5);
+        } else {
+          result[key] = num;
+        }
         break;
       }
       case "expiryDate": {
@@ -1158,10 +1186,12 @@ function addDebugButton() {
   }
 
   const buttonContainer = document.createElement("div");
+  buttonContainer.id = "options-flow-debug-button-container";
   buttonContainer.style.position = "fixed";
   buttonContainer.style.bottom = "20px";
   buttonContainer.style.right = "20px";
   buttonContainer.style.display = "flex";
+  buttonContainer.style.flexDirection = "row"; // ensure buttons are side by side
   buttonContainer.style.gap = "10px";
   buttonContainer.style.zIndex = "9999";
 
@@ -1193,6 +1223,7 @@ function addDebugButton() {
   multiButton.id = "options-flow-multi-button";
   multiButton.textContent = "Insert Related Entries";
   multiButton.style.backgroundColor = "#10b981";
+  multiButton.style.marginRight = "150px";
   multiButton.style.color = "white";
   multiButton.style.border = "none";
   multiButton.style.borderRadius = "4px";

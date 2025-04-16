@@ -1,5 +1,6 @@
 import { BooleanSetting, InputSetting } from "@/components/setting";
 import { defaultSettings, useSettingStore } from "@/lib/settings";
+import { sendMessage } from "@/components/setting";
 
 const Settings = () => {
   const { settings } = useSettingStore();
@@ -69,6 +70,17 @@ const Settings = () => {
         id="maxExp"
         type="string"
         placeholder={defaultSettings.maxExp}
+      />
+      <BooleanSetting
+        title={`Debug Mode`}
+        value={settings.debug}
+        id="debug"
+        callback={(value: boolean) => {
+          sendMessage({
+            type: "debug",
+            value: value,
+          });
+        }}
       />
     </div>
   );
