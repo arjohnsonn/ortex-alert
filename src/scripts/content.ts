@@ -1467,6 +1467,10 @@ function processEntriesAfterDelay(
             const entryElement = node as HTMLDivElement;
             const entry = extractData(entryElement);
 
+            if (!entry) {
+              return;
+            }
+
             if (entry.type == "unknown") {
               return;
             }
@@ -1478,6 +1482,10 @@ function processEntriesAfterDelay(
               strikeStr.length - dotIndex - 1 === 2 &&
               strikeStr.substring(dotIndex) !== ".5"
             ) {
+              return;
+            }
+
+            if (entry.time < 0) {
               return;
             }
 
