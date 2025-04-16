@@ -60,6 +60,7 @@ interface Alert {
     date1: string;
     date2: string;
     date3: string;
+    updated: boolean;
   };
 }
 
@@ -692,8 +693,15 @@ function extractData(entry: HTMLDivElement): Entry {
       const firstRow = pinnedContainer.querySelector<HTMLElement>(
         `[data-rowindex="${extractedEntry.rowIndex}"]`
       );
+
       if (firstRow) {
         extractedEntry.symbol = extractSymbol(firstRow);
+
+        if (!extractedEntry.symbol) {
+          // console.log("First row not found 1", entry);
+        }
+      } else {
+        // console.log("First row not found 2", entry);
       }
     }
   } else if (URL_SYMBOL) {
@@ -1405,6 +1413,7 @@ function processEntriesAfterDelay(
               false,
               true
             ),
+            updated: false,
           },
         };
 
@@ -1419,15 +1428,26 @@ function processEntriesAfterDelay(
         const alertId = generateAlertId(alertWithoutId);
 
         const currentAlert = alerts.find((alert) => alert.id === alertId);
+        const currentAlertIndex = alerts.findIndex(
+          (alert) => alert.id === alertId
+        );
 
-        if (currentAlert) {
+        if (currentAlert && currentAlertIndex) {
           currentAlert.entries = matching;
           currentAlert.totalValue = total;
           currentAlert.timestamp = Date.now();
 
-          toastSystem.showToast(
-            toastSystem.convertAlertToFlowAlert(currentAlert)
-          );
+          if (currentAlert.metadata.updated == undefined) {
+            currentAlert.metadata.updated = false;
+          }
+          currentAlert.metadata.updated = true;
+
+          alerts.splice(currentAlertIndex, 1);
+          alerts.push(currentAlert);
+
+          // toastSystem.showToast(
+          //   toastSystem.convertAlertToFlowAlert(currentAlert)
+          // );
         } else {
           const newAlert: Alert = {
             ...alertWithoutId,
@@ -1467,7 +1487,7 @@ function processEntriesAfterDelay(
             const entryElement = node as HTMLDivElement;
             const entry = extractData(entryElement);
 
-            if (!entry) {
+            if (!entry || entry.symbol === "UNKWN") {
               return;
             }
 

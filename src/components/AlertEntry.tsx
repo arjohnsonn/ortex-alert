@@ -10,6 +10,7 @@ type Props = {
   expires: string; // unix timestamp
   date: string; // unix timestamp
   time: string;
+  updated: boolean;
 };
 
 function convertToUnixTimestamp(input: string): number {
@@ -246,7 +247,7 @@ function getAlertDate(date: string, format: boolean, words: boolean): string {
   }
 }
 
-function getTimeAgo(date: string) {
+function getTimeAgo(date: string, updated: boolean): string {
   const now = new Date();
   const pastDate = new Date(parseInt(date));
   const seconds = Math.floor((now.getTime() - pastDate.getTime()) / 1000);
@@ -260,7 +261,9 @@ function getTimeAgo(date: string) {
   if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
   if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
   if (minutes > 0) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
-  return `${seconds} second${seconds > 1 ? "s" : ""} ago`;
+  return `${updated ? "Updated " : ""}${seconds} second${
+    seconds > 1 ? "s" : ""
+  } ago`;
 }
 
 function formatNumber(num: number) {
@@ -296,7 +299,7 @@ const AlertEntry = (props: Props) => {
 
         <div className="flex flex-row gap-x-2 text-zinc-500 items-center">
           <Clock size={12} />
-          <p className="text-xxxs">{getTimeAgo(props.date)}</p>
+          <p className="text-xxxs">{getTimeAgo(props.date, props.updated)}</p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-x-12 gap-y-2 mt-2">

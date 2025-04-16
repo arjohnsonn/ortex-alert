@@ -22,6 +22,7 @@ type SavedEntry = {
     date1: string;
     date2: string;
     date3: string;
+    updated: boolean;
   };
 };
 
@@ -214,6 +215,7 @@ function App() {
                         time={alert.timestamp.toString()}
                         strikeRange={alert.strikeRange}
                         expires={alert.expiryDate}
+                        updated={alert.metadata?.updated ?? false}
                       />
                     ))}
               </TabsContent>
